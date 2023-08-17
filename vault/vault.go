@@ -22,13 +22,11 @@ type Config struct {
 }
 
 type Vault struct {
-	client *api.Client
-
+	client     *api.Client
+	RoleID     string
+	SecretID   string
 	transitCfg *TransitConfig
 	secretsCfg *SecretsConfig
-
-	RoleID   string
-	SecretID string
 }
 
 type SecretsConfig struct {
@@ -64,10 +62,10 @@ func New(cfg *Config) (*Vault, error) {
 
 	vault := &Vault{
 		client:     client,
-		transitCfg: cfg.TransitConfig,
-		secretsCfg: cfg.SecretsConfig,
 		RoleID:     cfg.RoleID,
 		SecretID:   cfg.SecretID,
+		transitCfg: cfg.TransitConfig,
+		secretsCfg: cfg.SecretsConfig,
 	}
 
 	if err = vault.login(); err != nil {

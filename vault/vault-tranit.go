@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -61,14 +62,22 @@ func (t *Transit) ImportKey(keyName string, keyType string, key []byte) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to import key")
+		return err
 	}
 
 	return nil
 }
 
 func (t *Transit) GetKey(keyName string) (string, error) {
-	s, err := t.c.Logical().Read(fmt.Sprintf("%s/keys/%s", t.cfg.MountPoint, keyName))
+	return t.getKey(context.Background(), keyName)
+}
+
+func (t *Transit) GetKeyWithContext(ctx context.Context, keyName string) (string, error) {
+	return t.getKey(ctx, keyName)
+}
+
+func (t *Transit) getKey(ctx context.Context, keyName string) (string, error) {
+	s, err := t.c.Logical().ReadWithContext(ctx, fmt.Sprintf("%s/keys/%s", t.cfg.MountPoint, keyName))
 	if err != nil {
 		return "", err
 	}
@@ -88,6 +97,34 @@ func (t *Transit) GetKey(keyName string) (string, error) {
 	}
 
 	return pk, nil
+}
+
+func (t *Transit) ListKeys() ([]string, error) {
+	var res []string
+	s, err := t.c.Logical().List(fmt.Sprintf("%s/keys", t.cfg.MountPoint))
+	if err != nil {
+		return res, err
+	}
+	if s == nil {
+		return res, fmt.Errorf("no key was returned")
+	}
+
+	keys, ok := s.Data["keys"].([]interface{})
+	if !ok {
+		return res, fmt.Errorf("failed to parse keys")
+	}
+
+	// excluding 'import' path as it's not a key and used for storing imported keys
+	res = make([]string, 0, len(keys)-1)
+	for _, key := range keys {
+		keyStr := key.(string)
+		if keyStr == "import/" {
+			continue
+		}
+		res = append(res, keyStr)
+	}
+
+	return res, nil
 }
 
 func (t *Transit) Sign(keyName string, input []byte, opts *SignOpts) ([]byte, error) {

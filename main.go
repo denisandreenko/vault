@@ -1,14 +1,22 @@
 package main
 
 import (
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"log"
 	"os"
 
+	"github.com/consensys/gnark-crypto/ecc/bls24-315/twistededwards/eddsa"
 	"github.com/denisandreenko/vault/vault"
 
 	"gopkg.in/yaml.v2"
 )
+
+type Key struct {
+	ID     string
+	PubKey *eddsa.PublicKey
+}
 
 func main() {
 	configYaml, err := os.ReadFile("config.yaml")
@@ -26,5 +34,26 @@ func main() {
 		log.Fatalf("Vault initialization error: %v", err)
 	}
 
-	fmt.Println(v)
+	keys, err := v.Transit().ListKeys()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(keys)
+
+	wrappingKeyString, err := v.Transit().GetKey(keys[0])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	keyBlock, _ := pem.Decode([]byte(wrappingKeyString))
+	if keyBlock == nil {
+		log.Fatal("failed to decode PEM block")
+	}
+	pubKey, err := x509.ParsePKIXPublicKey(keyBlock.Bytes)
+	if err != nil {
+		log.Fatalf("failed to parse public key: %v", err)
+	}
+	pkKey := &Key{PubKey: pubKey.(*eddsa.PublicKey)}
+
+	fmt.Println("Pub Key: ", pkKey.ID)
 }
