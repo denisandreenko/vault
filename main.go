@@ -1,14 +1,15 @@
 package main
 
 import (
-	"crypto/x509"
-	"encoding/pem"
+	"crypto/ed25519"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
 
 	"github.com/consensys/gnark-crypto/ecc/bls24-315/twistededwards/eddsa"
 	"github.com/denisandreenko/vault/vault"
+	"github.com/ecadlabs/signatory/pkg/crypt"
 
 	"gopkg.in/yaml.v2"
 )
@@ -45,15 +46,22 @@ func main() {
 		log.Fatal(err)
 	}
 
-	keyBlock, _ := pem.Decode([]byte(wrappingKeyString))
-	if keyBlock == nil {
-		log.Fatal("failed to decode PEM block")
-	}
-	pubKey, err := x509.ParsePKIXPublicKey(keyBlock.Bytes)
+	pubKeyBytes, err := base64.StdEncoding.DecodeString(wrappingKeyString)
 	if err != nil {
-		log.Fatalf("failed to parse public key: %v", err)
+		log.Fatal(err)
 	}
-	pkKey := &Key{PubKey: pubKey.(*eddsa.PublicKey)}
 
-	fmt.Println("Pub Key: ", pkKey.ID)
+	if len(pubKeyBytes) != ed25519.PublicKeySize {
+		log.Fatal("invalid public key length")
+	}
+
+	// Convert the bytes to an Ed25519 public key
+	eddsaPublicKey := ed25519.PublicKey(pubKeyBytes)
+
+	cryptPubKey, err := crypt.NewPublicKeyFrom(eddsaPublicKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(cryptPubKey)
 }
